@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#080e20" />
+  <meta name="description" content="Цифровой речевой код подростка — образовательная 3D-игра исследовательского проекта «Зерде»." />
+  <title>Цифровой речевой код подростка — 3D-приключение</title>
+  <link rel="stylesheet" href="./style.css" />
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js"}}</script>
+</head>
+<body>
+  <div id="game-root" aria-label="Трёхмерный игровой мир"></div>
+  <div class="vignette" aria-hidden="true"></div>
+  <header id="hud" class="hud hidden">
+    <div class="hud-brand"><span class="brand-mark">✦</span><div><b>РЕЧЕВОЙ КОД</b><small id="hud-world">Мир 1</small></div></div>
+    <div class="hud-stats"><span title="Баллы">✧ <b id="hud-score">0</b></span><span title="Монеты">◈ <b id="hud-coins">0</b></span><span title="Опыт">⚡ <b id="hud-xp">0</b></span><span title="Задания">✓ <b id="hud-tasks">0/5</b></span></div>
+    <button id="pause-button" class="icon-button" aria-label="Пауза">☰</button>
+  </header>
+  <div id="world-banner" class="world-banner hidden"><span id="banner-kicker">МИР 01</span><strong id="banner-title">Город цифрового общения</strong><span id="banner-subtitle">Найди терминалы и реши задания</span></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <div id="interact-hint" class="interact-hint hidden"><kbd>E</kbd><span id="interact-text">Взаимодействовать</span></div>
+  <div id="quest-panel" class="quest-panel hidden"><span class="eyebrow">ТЕКУЩАЯ МИССИЯ</span><b id="quest-text">Найди задания</b><div class="progress-track"><div id="quest-fill"></div></div><small id="quest-progress">0 из 5</small></div>
+  <canvas id="minimap" class="minimap hidden" width="180" height="180" aria-label="Мини-карта игрового мира"></canvas>
+  <div id="controls-help" class="controls-help hidden">WASD / ↑↓←→ — движение · Мышь — камера · Пробел — прыжок · E — действие · Shift — бег · Esc — пауза</div>
+  <div id="mobile-controls" class="mobile-controls hidden" aria-label="Экранное управление">
+    <div class="joystick" id="joystick"><div id="joystick-knob"></div></div>
+    <div class="touch-actions"><button id="touch-interact" aria-label="Взаимодействовать">E</button><button id="touch-jump" aria-label="Прыжок">↥</button><button id="touch-run" aria-label="Бег">↯</button></div>
+  </div>
+  <main id="ui" aria-live="polite"></main>
+  <div id="fatal" class="fatal hidden" role="alert"></div>
+  <script type="module" src="./game.js"></script>
+</body>
+</html>
