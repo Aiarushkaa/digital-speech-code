@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {WORLD_CONFIG,baseWorld,finishWorld,box,cylinder,sign} from './shared.js';
+import {WORLD_CONFIG,baseWorld,finishWorld,box,cylinder,sign,sphere} from './shared.js';
 export function createCampus() {
   const w=baseWorld(WORLD_CONFIG[2],0x2c5653,0x76c3b2);
   for(let i=0;i<3;i++) {const x=(i-1)*29,z=-22;
