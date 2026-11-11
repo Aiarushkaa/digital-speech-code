@@ -1,49 +1,91 @@
 
 import * as THREE from 'three';
-import {WORLD_CONFIG,baseWorld,finishWorld,box,cylinder,sign,sphere} from './shared.js';
+
+import {
+  WORLD_CONFIG,
+  baseWorld,
+  finishWorld,
+  box,
+  cylinder,
+  sign,
+  sphere
+} from './shared.js';
 
 export function createCampus() {
-  const w=baseWorld(WORLD_CONFIG[2],0x2c5653,0x76c3b2);
+  const w = baseWorld(WORLD_CONFIG[2], 0x2c5653, 0x76c3b2);
 
   // Шестое задание рядом с контрольной точкой
   w.positions[5] = [-5, 5];
 
-  for(let i=0;i<3;i++) {
-    const x=(i-1)*29,z=-22;
-    const building=box(18,9,10,0xd1c5a7,x,4.5,z);
-    w.group.add(building);
-    w.obstacles.push({x,z,r:6.8});
+  // Здания академического кампуса
+  for (let i = 0; i < 3; i++) {
+    const x = (i - 1) * 29;
+    const z = -22;
 
-    const roof=box(20,.8,12,0x264d56,x,9.5,z);
+    const building = box(18, 9, 10, 0xd1c5a7, x, 4.5, z);
+    w.group.add(building);
+    w.obstacles.push({ x, z, r: 6.8 });
+
+    const roof = box(20, 0.8, 12, 0x264d56, x, 9.5, z);
     w.group.add(roof);
 
-    for(let j=0;j<5;j++){
-      const col=cylinder(.45,.5,6,0xf3e8d3,x-7+j*3.5,3.3,z+5.3);
+    for (let j = 0; j < 5; j++) {
+      const col = cylinder(
+        0.45, 0.5, 6, 0xf3e8d3,
+        x - 7 + j * 3.5, 3.3, z + 5.3
+      );
       w.group.add(col);
     }
 
-    const door=box(2.5,3.5,.15,0x314f5b,x,1.75,z+5.15);
+    const door = box(
+      2.5, 3.5, 0.15, 0x314f5b,
+      x, 1.75, z + 5.15
+    );
     w.group.add(door);
   }
 
-  for(let i=0;i<10;i++){
-    const a=i*2*Math.PI/10,x=Math.cos(a)*35,z=Math.sin(a)*35;
-    const trunk=cylinder(.35,.5,4,0x695e54,x,2,z);
+  // Деревья
+  for (let i = 0; i < 10; i++) {
+    const a = i * 2 * Math.PI / 10;
+    const x = Math.cos(a) * 35;
+    const z = Math.sin(a) * 35;
+
+    const trunk = cylinder(
+      0.35, 0.5, 4, 0x695e54,
+      x, 2, z
+    );
     w.group.add(trunk);
 
-    for(let j=0;j<3;j++){
-      const canopy=sphere(2.4-j*.35,0x5b9f80,x,4.1+j*1.25,z,12);
+    for (let j = 0; j < 3; j++) {
+      const canopy = sphere(
+        2.4 - j * 0.35,
+        0x5b9f80,
+        x, 4.1 + j * 1.25, z, 12
+      );
       w.group.add(canopy);
     }
   }
 
-  for(let i=0;i<6;i++){
-    const x=-30+i*12;
-    const bench=box(3,.25,1,0x8b745b,x,.8,30);
+  // Скамейки
+  for (let i = 0; i < 6; i++) {
+    const x = -30 + i * 12;
+
+    const bench = box(
+      3, 0.25, 1, 0x8b745b,
+      x, 0.8, 30
+    );
     w.group.add(bench);
   }
 
-  w.group.add(sign('АКАДЕМИЧЕСКИЙ КАМПУС',0,10,1,'#c2fff1',4.4));
+  // Название кампуса
+  w.group.add(
+    sign(
+      'АКАДЕМИЧЕСКИЙ КАМПУС',
+      0, 10, 1,
+      '#c2fff1',
+      4.4
+    )
+  );
 
-  return finishWorld(w,6);
+  return finishWorld(w, 6);
 }
