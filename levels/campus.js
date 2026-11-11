@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {WORLD_CONFIG,baseWorld,finishWorld,box,cylinder,sign,sphere} from './shared.js';
 export function createCampus() {
   const w=baseWorld(WORLD_CONFIG[2],0x2c5653,0x76c3b2);
-  w.positions[5] = [-6, 7];
+w.positions[5] = [-5, 5];
     const building=box(18,9,10,0xd1c5a7,x,4.5,z);w.group.add(building);w.obstacles.push({x,z,r:6.8});
     const roof=box(20,.8,12,0x264d56,x,9.5,z);w.group.add(roof);
     for(let j=0;j<5;j++){const col=cylinder(.45,.5,6,0xf3e8d3,x-7+j*3.5,3.3,z+5.3);w.group.add(col);}
