@@ -1,0 +1,331 @@
+
+const MUSIC_TRACKS = [
+  {
+    name: 'digital-city',
+    tempo: 650,
+    wave: 'sine',
+    chords: [
+      [261.63, 329.63, 392.00],
+      [220.00, 261.63, 329.63],
+      [174.61, 220.00, 261.63],
+      [196.00, 246.94, 293.66]
+    ]
+  },
+  {
+    name: 'memes',
+    tempo: 480,
+    wave: 'triangle',
+    chords: [
+      [293.66, 369.99, 440.00],
+      [329.63, 392.00, 493.88],
+      [261.63, 329.63, 392.00],
+      [293.66, 369.99, 440.00]
+    ]
+  },
+  {
+    name: 'campus',
+    tempo: 1000,
+    wave: 'sine',
+    chords: [
+      [261.63, 329.63, 392.00],
+      [293.66, 349.23, 440.00],
+      [220.00, 261.63, 329.63],
+      [196.00, 246.94, 293.66]
+    ]
+  },
+  {
+    name: 'laboratory',
+    tempo: 550,
+    wave: 'triangle',
+    chords: [
+      [220.00, 277.18, 329.63],
+      [246.94, 311.13, 369.99],
+      [196.00, 246.94, 293.66],
+      [220.00, 277.18, 329.63]
+    ]
+  },
+  {
+    name: 'arena',
+    tempo: 400,
+    wave: 'sawtooth',
+    chords: [
+      [196.00, 246.94, 293.66],
+      [220.00, 277.18, 329.63],
+      [261.63, 329.63, 392.00],
+      [220.00, 277.18, 329.63]
+    ]
+  }
+];
+
+export class GameAudio {
+  constructor() {
+    this.context = null;
+    this.musicBus = null;
+    this.sfxBus = null;
+
+    this.musicEnabled = true;
+    this.sfxEnabled = true;
+
+    this.musicVolume = 0.22;
+    this.sfxVolume = 0.55;
+
+    this.worldIndex = 0;
+    this.chordIndex = 0;
+    this.musicTimer = null;
+    this.started = false;
+  }
+
+  async start() {
+    if (!this.context) {
+      const AudioContextClass =
+        window.AudioContext || window.webkitAudioContext;
+
+      if (!AudioContextClass) return false;
+
+      this.context = new AudioContextClass();
+
+      this.musicBus = this.context.createGain();
+      this.sfxBus = this.context.createGain();
+
+      this.musicBus.gain.value = this.musicVolume;
+      this.sfxBus.gain.value = this.sfxVolume;
+
+      this.musicBus.connect(this.context.destination);
+      this.sfxBus.connect(this.context.destination);
+    }
+
+    await this.context.resume();
+    this.started = true;
+
+    if (this.musicEnabled) {
+      this.startMusic();
+    }
+
+    return true;
+  }
+
+  setWorld(index) {
+    this.worldIndex = Math.max(
+      0,
+      Math.min(4, Number(index) || 0)
+    );
+
+    this.chordIndex = 0;
+
+    if (this.started && this.musicEnabled) {
+      this.startMusic();
+    }
+  }
+
+  startMusic() {
+    this.stopMusic();
+
+    if (!this.started || !this.musicEnabled) return;
+
+    const track = MUSIC_TRACKS[this.worldIndex];
+
+    this.musicBus.gain.setTargetAtTime(
+      this.musicVolume,
+      this.context.currentTime,
+      0.3
+    );
+
+    const playChord = () => {
+      if (!this.musicEnabled || !this.started) return;
+
+      const chord = track.chords[
+        this.chordIndex % track.chords.length
+      ];
+
+      this.chordIndex++;
+
+      chord.forEach((frequency, index) => {
+        const oscillator = this.context.createOscillator();
+        const envelope = this.context.createGain();
+
+        oscillator.type = track.wave;
+        oscillator.frequency.value = frequency;
+
+        envelope.gain.setValueAtTime(
+          0.0001,
+          this.context.currentTime
+        );
+
+        envelope.gain.exponentialRampToValueAtTime(
+          index === 0 ? 0.12 : 0.07,
+          this.context.currentTime + 0.25
+        );
+
+        envelope.gain.setTargetAtTime(
+          0.0001,
+          this.context.currentTime + 1.8,
+          0.8
+        );
+
+        oscillator.connect(envelope);
+        envelope.connect(this.musicBus);
+
+        oscillator.start();
+        oscillator.stop(this.context.currentTime + 3.5);
+      });
+
+      this.musicTimer = setTimeout(
+        playChord,
+        track.tempo * 4
+      );
+    };
+
+    playChord();
+  }
+
+  stopMusic() {
+    if (this.musicTimer) {
+      clearTimeout(this.musicTimer);
+      this.musicTimer = null;
+    }
+
+    if (this.musicBus && this.context) {
+      this.musicBus.gain.setTargetAtTime(
+        0,
+        this.context.currentTime,
+        0.15
+      );
+    }
+  }
+
+  setMusicEnabled(enabled) {
+    this.musicEnabled = Boolean(enabled);
+
+    if (!this.started) return;
+
+    if (this.musicEnabled) {
+      this.startMusic();
+    } else {
+      this.stopMusic();
+    }
+  }
+
+  setSfxEnabled(enabled) {
+    this.sfxEnabled = Boolean(enabled);
+  }
+
+  setMusicVolume(value) {
+    this.musicVolume = Math.max(0, Math.min(1, value));
+
+    if (this.musicBus && this.context && this.musicEnabled) {
+      this.musicBus.gain.setTargetAtTime(
+        this.musicVolume,
+        this.context.currentTime,
+        0.1
+      );
+    }
+  }
+
+  setSfxVolume(value) {
+    this.sfxVolume = Math.max(0, Math.min(1, value));
+
+    if (this.sfxBus && this.context) {
+      this.sfxBus.gain.setTargetAtTime(
+        this.sfxVolume,
+        this.context.currentTime,
+        0.1
+      );
+    }
+  }
+
+  tone(frequency, duration = 0.18, type = 'sine', delay = 0) {
+    if (!this.started || !this.sfxEnabled) return;
+
+    const oscillator = this.context.createOscillator();
+    const envelope = this.context.createGain();
+
+    const startAt = this.context.currentTime + delay;
+
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, startAt);
+
+    envelope.gain.setValueAtTime(0.0001, startAt);
+    envelope.gain.exponentialRampToValueAtTime(
+      0.25,
+      startAt + 0.025
+    );
+    envelope.gain.exponentialRampToValueAtTime(
+      0.0001,
+      startAt + duration
+    );
+
+    oscillator.connect(envelope);
+    envelope.connect(this.sfxBus);
+
+    oscillator.start(startAt);
+    oscillator.stop(startAt + duration + 0.03);
+  }
+
+  playSfx(name) {
+    const sounds = {
+      correct: [660, 880],
+      wrong: [220, 165],
+      coin: [880, 1174, 1320],
+      achievement: [523, 659, 784, 1046],
+      portal: [330, 440, 660],
+      click: [600],
+      levelUp: [523, 659, 784, 1046]
+    };
+
+    const notes = sounds[name];
+
+    if (!notes || !this.started || !this.sfxEnabled) return;
+
+    notes.forEach((frequency, index) => {
+      this.tone(
+        frequency,
+        0.2,
+        'sine',
+        index * 0.12
+      );
+    });
+  }
+
+  speak(message) {
+    if (!('speechSynthesis' in window)) return;
+
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(message);
+
+    utterance.lang = 'ru-RU';
+    utterance.rate = 0.95;
+    utterance.pitch = 1.05;
+    utterance.volume = 1;
+
+    const voices = window.speechSynthesis.getVoices();
+
+    const russianVoice = voices.find(voice =>
+      voice.lang.toLowerCase().startsWith('ru')
+    );
+
+    if (russianVoice) {
+      utterance.voice = russianVoice;
+    }
+
+    window.speechSynthesis.speak(utterance);
+  }
+
+  stopSpeech() {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
+  destroy() {
+    this.stopMusic();
+    this.stopSpeech();
+
+    if (this.context) {
+      this.context.close();
+      this.context = null;
+    }
+
+    this.started = false;
+  }
+}
