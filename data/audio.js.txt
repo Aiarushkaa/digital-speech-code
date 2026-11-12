@@ -1,12 +1,4 @@
 
-const TRACKS = [
-  { bpm: 112, notes: [261.63, 329.63, 392, 523.25], bass: 65.41 },
-  { bpm: 126, notes: [293.66, 369.99, 440, 587.33], bass: 73.42 },
-  { bpm: 88, notes: [261.63, 329.63, 392, 493.88], bass: 65.41 },
-  { bpm: 118, notes: [220, 277.18, 329.63, 440], bass: 55 },
-  { bpm: 138, notes: [196, 246.94, 293.66, 392], bass: 49 }
-];
-
 export class GameAudio {
   constructor() {
     this.ctx = null;
@@ -14,33 +6,43 @@ export class GameAudio {
     this.musicBus = null;
     this.sfxBus = null;
 
+    this.started = false;
     this.musicEnabled = true;
     this.sfxEnabled = true;
     this.voiceEnabled = true;
+    this.volume = 0.7;
 
-    this.volume = 0.65;
-    this.world = 0;
-    this.stepTimer = null;
     this.musicTimer = null;
-    this.nextBeat = 0;
-    this.beat = 0;
-    this.started = false;
+    this.musicStep = 0;
+    this.worldIndex = 0;
+
+    this.tracks = [
+      { name: 'city', notes: [261, 329, 392, 329, 293, 349, 440, 349], wave: 'sine', tempo: 380 },
+      { name: 'memes', notes: [392, 440, 523, 440, 349, 392, 587, 523], wave: 'triangle', tempo: 260 },
+      { name: 'campus', notes: [293, 349, 440, 392, 329, 392, 494, 440], wave: 'sine', tempo: 420 },
+      { name: 'laboratory', notes: [220, 277, 330, 415, 330, 277, 370, 440], wave: 'triangle', tempo: 340 },
+      { name: 'arena', notes: [196, 247, 294, 370, 294, 247, 330, 392], wave: 'sawtooth', tempo: 300 }
+    ];
   }
 
   async start() {
     if (!this.ctx) {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return false;
+      const AudioContextClass =
+        window.AudioContext || window.webkitAudioContext;
 
-      this.ctx = new AC();
+      if (!AudioContextClass) {
+        throw new Error('Web Audio API не поддерживается');
+      }
+
+      this.ctx = new AudioContextClass();
 
       this.master = this.ctx.createGain();
       this.musicBus = this.ctx.createGain();
       this.sfxBus = this.ctx.createGain();
 
       this.master.gain.value = this.volume;
-      this.musicBus.gain.value = 0.55;
-      this.sfxBus.gain.value = 0.9;
+      this.musicBus.gain.value = 0.22;
+      this.sfxBus.gain.value = 0.8;
 
       this.musicBus.connect(this.master);
       this.sfxBus.connect(this.master);
@@ -51,66 +53,121 @@ export class GameAudio {
     this.started = true;
 
     this.launchEffect();
-
-    if (this.musicEnabled) this.startMusic();
-    return true;
-  }
-
-  setWorld(index) {
-    this.world = Math.max(0, Math.min(4, Number(index) || 0));
-    this.beat = 0;
-    if (this.started && this.musicEnabled) this.startMusic();
+    this.startMusic();
   }
 
   setVolume(value) {
     this.volume = Math.max(0, Math.min(1, value));
-    if (this.master) this.master.gain.setTargetAtTime(
-      this.volume, this.ctx.currentTime, 0.1
-    );
+
+    if (this.master && this.ctx) {
+      this.master.gain.setTargetAtTime(
+        this.volume,
+        this.ctx.currentTime,
+        0.05
+      );
+    }
   }
 
-  setMusicEnabled(value) {
-    this.musicEnabled = Boolean(value);
-    if (!this.started) return;
-    if (this.musicEnabled) this.startMusic();
+  setMusicEnabled(enabled) {
+    this.musicEnabled = enabled;
+
+    if (this.musicBus && this.ctx) {
+      this.musicBus.gain.setTargetAtTime(
+        enabled ? 0.22 : 0,
+        this.ctx.currentTime,
+        0.08
+      );
+    }
+
+    if (enabled) this.startMusic();
     else this.stopMusic();
   }
 
-  setSfxEnabled(value) {
-    this.sfxEnabled = Boolean(value);
+  setSfxEnabled(enabled) {
+    this.sfxEnabled = enabled;
+
+    if (this.sfxBus && this.ctx) {
+      this.sfxBus.gain.setTargetAtTime(
+        enabled ? 0.8 : 0,
+        this.ctx.currentTime,
+        0.05
+      );
+    }
   }
 
-  setVoiceEnabled(value) {
-    this.voiceEnabled = Boolean(value);
-    if (!this.voiceEnabled) this.stopSpeech();
+  setVoiceEnabled(enabled) {
+    this.voiceEnabled = enabled;
+
+    if (!enabled) this.stopSpeech();
   }
 
-  tone(freq, duration, type = 'sine', volume = 0.15, bus = this.sfxBus, when = 0) {
-    if (!this.ctx) return;
+  setWorld(index) {
+    this.worldIndex = Math.max(
+      0,
+      Math.min(this.tracks.length - 1, index)
+    );
 
-    const t = this.ctx.currentTime + when;
-    const osc = this.ctx.createOscillator();
+    this.musicStep = 0;
+
+    if (this.musicEnabled && this.started) {
+      this.stopMusic();
+      this.startMusic();
+    }
+  }
+
+  tone(
+    frequency,
+    duration = 0.2,
+    type = 'sine',
+    volume = 0.15,
+    delay = 0,
+    destination = this.sfxBus
+  ) {
+    if (!this.started || !this.ctx || !destination) return;
+    if (destination === this.sfxBus && !this.sfxEnabled) return;
+
+    const now = this.ctx.currentTime + delay;
+
+    const oscillator = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
 
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, t);
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, now);
 
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(volume, t + 0.025);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(
+      Math.max(0.001, volume),
+      now + 0.02
+    );
+    gain.gain.exponentialRampToValueAtTime(
+      0.001,
+      now + duration
+    );
 
-    osc.connect(gain);
-    gain.connect(bus);
+    oscillator.connect(gain);
+    gain.connect(destination);
 
-    osc.start(t);
-    osc.stop(t + duration + 0.04);
+    oscillator.start(now);
+    oscillator.stop(now + duration + 0.03);
   }
 
-  noise(duration, volume, filterFrequency = 1200, when = 0) {
-    if (!this.ctx) return;
+  noise(
+    duration = 0.2,
+    volume = 0.12,
+    filterFrequency = 1200,
+    delay = 0,
+    destination = this.sfxBus
+  ) {
+    if (!this.started || !this.ctx || !destination) return;
+    if (destination === this.sfxBus && !this.sfxEnabled) return;
 
     const length = Math.floor(this.ctx.sampleRate * duration);
-    const buffer = this.ctx.createBuffer(1, length, this.ctx.sampleRate);
+    const buffer = this.ctx.createBuffer(
+      1,
+      length,
+      this.ctx.sampleRate
+    );
+
     const data = buffer.getChannelData(0);
 
     for (let i = 0; i < length; i++) {
@@ -120,182 +177,132 @@ export class GameAudio {
     const source = this.ctx.createBufferSource();
     const filter = this.ctx.createBiquadFilter();
     const gain = this.ctx.createGain();
-    const t = this.ctx.currentTime + when;
 
     source.buffer = buffer;
     filter.type = 'lowpass';
     filter.frequency.value = filterFrequency;
 
-    gain.gain.setValueAtTime(volume, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    const now = this.ctx.currentTime + delay;
+
+    gain.gain.setValueAtTime(volume, now);
+    gain.gain.exponentialRampToValueAtTime(
+      0.001,
+      now + duration
+    );
 
     source.connect(filter);
     filter.connect(gain);
-    gain.connect(this.sfxBus);
+    gain.connect(destination);
 
-    source.start(t);
-    source.stop(t + duration);
-  }
-
-  launchEffect() {
-    if (!this.sfxEnabled) return;
-
-    // Электронный запуск игры
-    this.noise(1.2, 0.22, 1800);
-    this.tone(55, 1.3, 'sawtooth', 0.16, this.sfxBus);
-    this.tone(110, 0.9, 'sine', 0.12, this.sfxBus, 0.25);
-
-    [220, 330, 440, 660, 880].forEach((f, i) => {
-      this.tone(f, 0.5, 'sawtooth', 0.07, this.sfxBus, 0.35 + i * 0.12);
-    });
+    source.start(now);
+    source.stop(now + duration);
   }
 
   startMusic() {
-    this.stopMusic();
-    if (!this.started || !this.musicEnabled) return;
+    if (!this.started || !this.musicEnabled || this.musicTimer) return;
 
-    const track = TRACKS[this.world];
-    const beatLength = 60 / track.bpm;
-
-    this.nextBeat = this.ctx.currentTime + 0.08;
-    this.beat = 0;
-
-    const schedule = () => {
-      while (this.nextBeat < this.ctx.currentTime + 0.15) {
-        this.playBeat(track, this.beat, this.nextBeat);
-        this.nextBeat += beatLength / 2;
-        this.beat++;
+    const playStep = () => {
+      if (!this.started || !this.musicEnabled) {
+        this.musicTimer = null;
+        return;
       }
-    };
 
-    schedule();
-    this.musicTimer = setInterval(schedule, 50);
-  }
+      const track = this.tracks[this.worldIndex];
+      const note = track.notes[this.musicStep % track.notes.length];
 
-  playBeat(track, beat, time) {
-    const step = beat % 8;
-
-    // Бас
-    if (step === 0 || step === 4) {
-      this.tone(
-        track.bass,
-        0.32,
-        'sawtooth',
-        0.09,
-        this.musicBus,
-        Math.max(0, time - this.ctx.currentTime)
-      );
-    }
-
-    // Ритмичный удар
-    if (step === 0 || step === 4) {
-      this.kick(time);
-    }
-
-    // Перкуссия
-    if (step === 2 || step === 6) {
-      this.noiseAt(time, 0.045, 4500);
-    }
-
-    // Мелодия
-    if (step % 2 === 0) {
-      const note = track.notes[(beat + this.world) % track.notes.length];
       this.tone(
         note,
-        0.22,
-        'triangle',
-        0.045,
-        this.musicBus,
-        Math.max(0, time - this.ctx.currentTime)
+        0.32,
+        track.wave,
+        0.075,
+        0,
+        this.musicBus
       );
-    }
-  }
 
-  kick(time) {
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    const t = Math.max(time, this.ctx.currentTime);
+      if (this.musicStep % 2 === 0) {
+        this.tone(
+          note / 2,
+          0.48,
+          'sine',
+          0.045,
+          0,
+          this.musicBus
+        );
+      }
 
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(120, t);
-    osc.frequency.exponentialRampToValueAtTime(35, t + 0.16);
+      if (this.musicStep % 4 === 0) {
+        this.noise(
+          0.08,
+          0.025,
+          900,
+          0,
+          this.musicBus
+        );
+      }
 
-    gain.gain.setValueAtTime(0.32, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      this.musicStep++;
 
-    osc.connect(gain);
-    gain.connect(this.musicBus);
+      this.musicTimer = setTimeout(
+        playStep,
+        track.tempo
+      );
+    };
 
-    osc.start(t);
-    osc.stop(t + 0.2);
-  }
-
-  noiseAt(time, volume, frequency) {
-    const delay = Math.max(0, time - this.ctx.currentTime);
-    this.noise(0.12, volume, frequency, delay);
+    playStep();
   }
 
   stopMusic() {
     if (this.musicTimer) {
-      clearInterval(this.musicTimer);
+      clearTimeout(this.musicTimer);
       this.musicTimer = null;
     }
   }
 
-  // Шаг игрока: вызывается из игрового цикла движения
+  launchEffect() {
+    this.tone(180, 0.5, 'sawtooth', 0.12);
+    this.tone(360, 0.6, 'sine', 0.1, 0.12);
+    this.tone(720, 0.7, 'sine', 0.08, 0.25);
+  }
+
   step() {
-    if (!this.started || !this.sfxEnabled) return;
-
-    this.noise(0.11, 0.19, 500);
-    this.tone(75, 0.09, 'sine', 0.12);
+    this.noise(0.07, 0.08, 350);
+    this.tone(75, 0.08, 'sine', 0.07);
   }
 
-  // Правильный ответ
   correct() {
-    if (!this.started || !this.sfxEnabled) return;
-
-    [523, 659, 784, 1046].forEach((f, i) => {
-      this.tone(f, 0.35, 'sine', 0.2, this.sfxBus, i * 0.09);
-    });
+    this.tone(523, 0.18, 'sine', 0.16);
+    this.tone(659, 0.2, 'sine', 0.16, 0.12);
+    this.tone(784, 0.35, 'sine', 0.18, 0.24);
   }
 
-  // Неправильный ответ
   wrong() {
-    if (!this.started || !this.sfxEnabled) return;
-
-    this.tone(220, 0.35, 'sawtooth', 0.17);
-    this.tone(165, 0.4, 'sawtooth', 0.15, this.sfxBus, 0.18);
+    this.tone(220, 0.25, 'sawtooth', 0.13);
+    this.tone(165, 0.4, 'triangle', 0.12, 0.18);
   }
 
   coin() {
-    if (!this.started || !this.sfxEnabled) return;
-
-    [880, 1174, 1568].forEach((f, i) => {
-      this.tone(f, 0.2, 'sine', 0.16, this.sfxBus, i * 0.07);
-    });
+    this.tone(880, 0.12, 'sine', 0.13);
+    this.tone(1175, 0.2, 'sine', 0.14, 0.1);
   }
 
   achievement() {
-    if (!this.started || !this.sfxEnabled) return;
-
-    [523, 659, 784, 1046, 1318].forEach((f, i) => {
-      this.tone(f, 0.45, 'triangle', 0.18, this.sfxBus, i * 0.13);
-    });
+    this.tone(523, 0.2, 'triangle', 0.15);
+    this.tone(659, 0.2, 'triangle', 0.15, 0.15);
+    this.tone(784, 0.2, 'triangle', 0.17, 0.3);
+    this.tone(1046, 0.6, 'sine', 0.18, 0.45);
   }
 
   portal() {
-    if (!this.started || !this.sfxEnabled) return;
-
-    this.noise(0.9, 0.25, 2400);
-    [110, 220, 440, 880].forEach((f, i) => {
-      this.tone(f, 0.65, 'sine', 0.14, this.sfxBus, i * 0.14);
-    });
+    this.tone(220, 0.5, 'sine', 0.13);
+    this.tone(440, 0.5, 'triangle', 0.12, 0.12);
+    this.tone(880, 0.7, 'sine', 0.1, 0.25);
+    this.noise(0.5, 0.08, 1800);
   }
 
   speak(message) {
     if (!this.voiceEnabled || !('speechSynthesis' in window)) return;
 
-    this.stopSpeech();
+    window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(message);
     utterance.lang = 'ru-RU';
@@ -303,27 +310,24 @@ export class GameAudio {
     utterance.pitch = 1;
     utterance.volume = 1;
 
-    const voice = speechSynthesis.getVoices().find(
-      v => v.lang.toLowerCase().startsWith('ru')
-    );
-
-    if (voice) utterance.voice = voice;
-    speechSynthesis.speak(utterance);
+    window.speechSynthesis.speak(utterance);
   }
 
   stopSpeech() {
-    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
   }
 
   destroy() {
     this.stopMusic();
     this.stopSpeech();
 
-    if (this.ctx) {
+    if (this.ctx && this.ctx.state !== 'closed') {
       this.ctx.close();
-      this.ctx = null;
     }
 
     this.started = false;
+    this.ctx = null;
   }
 }
